@@ -68,6 +68,10 @@ LexiMind 以一个本地 Python Web 服务器运行，同时提供 API 接口与
 | **Database · 数据库** | SQLite | Store word queries, user history, daily articles · 存储词汇记录、用户历史、每日文章 |
 | **LLM Integration · 大模型接入** | DeepSeek-V3 (primary) via SiliconCloud API<br>Gemini 1.5 Flash (optional) | Provide language intelligence · 提供语言智能 |
 
+> **Note · 注**：  
+> For simplicity, the application only provides access to DeepSeek-V3 by default. If you need to use other LLMs, please modify the relevant frontend and backend files after downloading.  
+> 出于简便性考虑，应用默认仅提供DeepSeek-V3的接入。如需使用其他大模型，请下载完成后自行修改前后端相关文件。
+
 ---
 
 ## 6. API Design · API 设计
@@ -106,7 +110,7 @@ LexiMind 以一个本地 Python Web 服务器运行，同时提供 API 接口与
 
 ---
 
-## 8. Deployment · 部署方式
+## 8. Deployment & Uninstallation · 部署与卸载方式
 
 The application can be run locally with only Python and pip. No Docker or Nginx required.
 
@@ -116,34 +120,105 @@ The application can be run locally with only Python and pip. No Docker or Nginx 
 - Python 3.10 or higher
 - pip (included with Python)
 
-**Local Startup · 本地启动命令**：
+---
 
-**Windows**:
-```bash
-run.bat
-```
+### Local Startup · 本地启动
 
-**macOS / Linux**:
-```bash
-chmod +x run.sh
-./run.sh
-```
+#### Windows
+
+1. Open a Command Prompt or PowerShell window in the LexiMind folder.  
+   在 LexiMind 文件夹中打开命令提示符或 PowerShell 窗口。
+
+2. Run the launcher script:  
+   运行启动脚本：
+   ```bash
+   run.bat
+   ```
+   (Alternatively, you can double-click `run.bat` directly. The script will guide you through the setup.)  
+   （也可以直接双击 `run.bat`，脚本将引导完成配置。）
 
 The script will automatically:
+- Check for a compatible Python version and offer to install it if missing
 - Create a Python virtual environment
 - Install required dependencies from `requirements.txt`
-- Prompt you to configure your API key in the `.env` file (if not already done)
+- Prompt you to enter your DeepSeek API key (first run only)
 - Start the backend server at `http://127.0.0.1:5000`
-- Open the application in your default browser
+- Open the application in your default browser once the server is ready
 
 启动脚本将自动完成以下操作：
+- 检查 Python 版本是否符合要求，若缺失则询问是否自动安装
 - 创建 Python 虚拟环境
 - 从 `requirements.txt` 安装所需依赖
-- 若未配置 API 密钥，提示您在 `.env` 文件中填写
+- 首次运行时提示输入 DeepSeek API 密钥
 - 在 `http://127.0.0.1:5000` 启动后端服务
-- 在默认浏览器中打开应用页面
+- 等待服务就绪后自动在默认浏览器中打开应用
+
+> **Note · 注意**：If you are behind a firewall or corporate network, you may need to configure proxy settings manually before running the script.  
+> 若处于防火墙或企业网络环境下，运行脚本前可能需要手动配置代理设置。
+
+#### macOS / Linux
+
+1. Open a terminal in the LexiMind folder.  
+   在 LexiMind 文件夹中打开终端。
+
+2. Make the launcher script executable and run it:  
+   赋予启动脚本执行权限并运行：
+   ```bash
+   chmod +x run.sh
+   ./run.sh
+   ```
+
+The script performs the same automated setup as the Windows version and will open the application at `http://127.0.0.1:5000`.
+
+启动脚本将执行与 Windows 版本相同的自动化配置流程，并在 `http://127.0.0.1:5000` 打开应用。
 
 ---
+
+### Uninstallation · 卸载
+
+To remove LexiMind user data (virtual environment, database, API key) while keeping the source files intact, use the provided uninstaller script.
+
+若希望移除 LexiMind 用户数据（虚拟环境、数据库、API 密钥）而保留源代码，请使用提供的卸载脚本。
+
+#### Windows
+
+1. Open a Command Prompt or PowerShell window in the LexiMind folder.  
+   在 LexiMind 文件夹中打开命令提示符或 PowerShell 窗口。
+
+2. Run the uninstaller script:  
+   运行卸载脚本：
+   ```bash
+   uninstall.bat
+   ```
+
+3. Follow the on‑screen prompts to choose the desired cleanup level.  
+   根据屏幕提示选择所需的清理级别。
+
+The uninstaller will attempt to move files to the Recycle Bin first; if that fails, it will permanently delete them. It **does not** remove the Python interpreter itself.
+
+卸载脚本会优先尝试将文件移至回收站；若失败则执行永久删除。脚本**不会**移除 Python 解释器本身。
+
+#### macOS / Linux
+
+1. Open a terminal in the LexiMind folder.  
+   在 LexiMind 文件夹中打开终端。
+
+2. Make the uninstaller script executable and run it:  
+   赋予卸载脚本执行权限并运行：
+   ```bash
+   chmod +x uninstall.sh
+   ./uninstall.sh
+   ```
+
+3. Follow the prompts to confirm removal.  
+   根据提示确认删除。
+
+After uninstalling user data, you may delete the entire LexiMind folder manually if you wish to remove the application completely.
+
+卸载用户数据后，若希望完全移除应用，可手动删除整个 LexiMind 文件夹。
+
+---
+
 
 ## 9. Expected Outcome · 预期成果
 
@@ -193,8 +268,10 @@ LexiMind/
 ├── leximind_macos/            # macOS standalone distribution · macOS 独立发行版
 │   └── run.sh                 # macOS launcher script · macOS 启动脚本
 │
-└── leximind_linux/            # Linux standalone distribution · Linux 独立发行版
-    └── run.sh                 # Linux launcher script · Linux 启动脚本
+├── leximind_linux/            # Linux standalone distribution · Linux 独立发行版
+|   └── run.sh                 # Linux launcher script · Linux 启动脚本
+|
+└─- leximind_development       # Content omitted. Containerized developing workflow · 内容略。此为容器化开发工作流。
 ```
 
 > **Note · 注**：The `leximind_development/` folder (containing Docker configuration) is maintained separately for containerized development workflows.  
