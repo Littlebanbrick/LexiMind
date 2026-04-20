@@ -43,10 +43,24 @@ fi
 
 echo "[OK] Using Python command: $PY_CMD (version $pyver)"
 
-# --- Virtual environment ---
+# --- Virtual environment with integrity check ---
+if [[ -d "venv" ]]; then
+    if [[ ! -f "venv/bin/activate" ]]; then
+        echo "[WARNING] venv/ directory exists but appears broken (activate script missing)."
+        echo "[INFO] Removing broken venv and recreating..."
+        rm -rf venv
+    fi
+fi
+
 if [[ ! -d "venv" ]]; then
     echo
     echo "[INFO] Creating Python virtual environment..."
+    if ! $PY_CMD -m venv --help &>/dev/null; then
+        echo "[ERROR] Python venv module not available."
+        echo "On Debian/Ubuntu: sudo apt install python3-venv"
+        echo "On Fedora/RHEL: sudo dnf install python3-venv"
+        exit 1
+    fi
     $PY_CMD -m venv venv
     if [[ $? -ne 0 ]]; then
         echo "[ERROR] Failed to create virtual environment."
@@ -91,7 +105,6 @@ fi
 # --- Start server ---
 echo
 echo "[INFO] Starting LexiMind backend server..."
-# Launch server in background, keeping venv active
 (
     source venv/bin/activate
     python backend/app.py
@@ -117,9 +130,9 @@ fi
 # --- Open browser ---
 echo "[INFO] Opening browser at $SERVER_URL"
 if command -v open &> /dev/null; then
-    open "$SERVER_URL"          # macOS
+    open "$SERVER_URL"
 elif command -v xdg-open &> /dev/null; then
-    xdg-open "$SERVER_URL"      # Linux
+    xdg-open "$SERVER_URL"
 else
     echo "[WARNING] Could not detect browser opener. Please visit $SERVER_URL manually."
 fi
@@ -133,5 +146,4 @@ echo "To stop the server, press Ctrl+C or close the terminal."
 echo "To restart LexiMind, run this script again."
 echo
 
-# Wait for server process (so script doesn't exit immediately)
 wait $SERVER_PID
