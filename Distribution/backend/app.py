@@ -8,7 +8,7 @@ and serves static frontend files for pure Python deployments.
 import time
 import os
 from collections import defaultdict
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, make_response
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -65,6 +65,16 @@ def serve_index():
     """Serve the main index.html file"""
     return send_from_directory(FRONTEND_DIR, 'index.html')
 
+@app.route('/favicon.ico')
+def blank_favicon():
+    response = make_response('')
+    response.headers['Content-Type'] = 'image/x-icon'
+    # Disable caching for the favicon to prevent repeated requests
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    # Return 204 No Content to prevent browser from trying to render an empty icon
+    return response, 204
 
 @app.route('/<path:filename>')
 def serve_static(filename):

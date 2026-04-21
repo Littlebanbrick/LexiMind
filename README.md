@@ -122,55 +122,80 @@ The application can be run locally with only Python and pip. No Docker or Nginx 
 
 ---
 
+### Getting the Distribution · 获取发行版
+
+The release files are located in the `Distribution/` folder of the repository.  
+You only need to download that folder to run LexiMind.
+
+发行版文件位于仓库的 `Distribution/` 目录中。您只需下载该文件夹即可运行 LexiMind。
+
+**Option 1: Clone the entire repository (recommended for developers)**  
+**选项 1：克隆整个仓库（推荐开发者）**
+```bash
+git clone https://github.com/Littlebanbrick/LexiMind.git
+cd LexiMind/Distribution
+```
+
+**Option 2: Sparse checkout (only download the Distribution folder)**  
+**选项 2：稀疏检出（仅下载 Distribution 文件夹）**
+```bash
+git clone --filter=blob:none --no-checkout https://github.com/Littlebanbrick/LexiMind.git
+cd LexiMind
+git sparse-checkout init --cone
+git sparse-checkout set Distribution
+git checkout main
+cd Distribution
+```
+
+---
+
 ### Local Startup · 本地启动
 
-#### Windows
+#### All Platforms (Windows / macOS / Linux)
 
-1. Open a Command Prompt or PowerShell window in the LexiMind folder.  
-   在 LexiMind 文件夹中打开命令提示符或 PowerShell 窗口。
+1. Open a terminal (Command Prompt / PowerShell on Windows, Terminal on macOS / Linux) in the `Distribution/` folder.  
+   在 `Distribution/` 文件夹中打开终端（Windows 使用命令提示符或 PowerShell，macOS / Linux 使用终端）。
 
-2. Run the launcher script:  
-   运行启动脚本：
+2. Run the Python launcher script:  
+   运行 Python 启动脚本：
    ```bash
-   run.bat
+   python run.py
    ```
-   (Alternatively, you can double-click `run.bat` directly. The script will guide you through the setup.)  
-   （也可以直接双击 `run.bat`，脚本将引导完成配置。）
+   (On some systems you may need to use `python3` instead of `python`.)  
+   （在某些系统上可能需要使用 `python3` 而非 `python`。）
 
 The script will automatically:
-- Check for a compatible Python version and offer to install it if missing
-- Create a Python virtual environment
+- Check that Python 3.10+ is available
+- Create a Python virtual environment (`venv/`)
 - Install required dependencies from `requirements.txt`
 - Prompt you to enter your DeepSeek API key (first run only)
 - Start the backend server at `http://127.0.0.1:5000`
 - Open the application in your default browser once the server is ready
 
 启动脚本将自动完成以下操作：
-- 检查 Python 版本是否符合要求，若缺失则询问是否自动安装
-- 创建 Python 虚拟环境
+- 检查 Python 3.10+ 是否可用
+- 创建 Python 虚拟环境 (`venv/`)
 - 从 `requirements.txt` 安装所需依赖
 - 首次运行时提示输入 DeepSeek API 密钥
 - 在 `http://127.0.0.1:5000` 启动后端服务
 - 等待服务就绪后自动在默认浏览器中打开应用
 
-> **Note · 注意**：If you are behind a firewall or corporate network, you may need to configure proxy settings manually before running the script.  
-> 若处于防火墙或企业网络环境下，运行脚本前可能需要手动配置代理设置。
-
-#### macOS / Linux
-
-1. Open a terminal in the LexiMind folder.  
-   在 LexiMind 文件夹中打开终端。
-
-2. Make the launcher script executable and run it:  
-   赋予启动脚本执行权限并运行：
-   ```bash
-   chmod +x run.sh
-   ./run.sh
-   ```
-
-The script performs the same automated setup as the Windows version and will open the application at `http://127.0.0.1:5000`.
-
-启动脚本将执行与 Windows 版本相同的自动化配置流程，并在 `http://127.0.0.1:5000` 打开应用。
+> **Important: Proxy Settings · 重要：代理设置**  
+> If you are behind a corporate firewall or using a proxy, the script may fail to download dependencies.  
+> Before running `run.py`, **temporarily clear your proxy environment variables**:
+> 
+> **Windows (Command Prompt)**:
+> ```cmd
+> set HTTP_PROXY=
+> set HTTPS_PROXY=
+> ```
+> **macOS / Linux**:
+> ```bash
+> unset HTTP_PROXY HTTPS_PROXY
+> ```
+> 
+> Alternatively, configure your proxy correctly in your system settings.  
+> 若处于企业防火墙或代理环境下，脚本可能无法下载依赖。运行 `run.py` 前请**临时清空代理环境变量**（命令见上），或在系统设置中正确配置代理。
 
 ---
 
@@ -180,45 +205,29 @@ To remove LexiMind user data (virtual environment, database, API key) while keep
 
 若希望移除 LexiMind 用户数据（虚拟环境、数据库、API 密钥）而保留源代码，请使用提供的卸载脚本。
 
-#### Windows
+#### All Platforms (Windows / macOS / Linux)
 
-1. Open a Command Prompt or PowerShell window in the LexiMind folder.  
-   在 LexiMind 文件夹中打开命令提示符或 PowerShell 窗口。
+1. Open a terminal in the `Distribution/` folder.  
+   在 `Distribution/` 文件夹中打开终端。
 
-2. Run the uninstaller script:  
-   运行卸载脚本：
+2. Run the Python uninstaller script:  
+   运行 Python 卸载脚本：
    ```bash
-   uninstall.bat
+   python uninstall.py
    ```
 
 3. Follow the on‑screen prompts to choose the desired cleanup level.  
    根据屏幕提示选择所需的清理级别。
 
-The uninstaller will attempt to move files to the Recycle Bin first; if that fails, it will permanently delete them. It **does not** remove the Python interpreter itself.
+The uninstaller will attempt to move files to the system trash/recycle bin first; if that fails, it will permanently delete them. It **does not** remove the Python interpreter itself.
 
-卸载脚本会优先尝试将文件移至回收站；若失败则执行永久删除。脚本**不会**移除 Python 解释器本身。
+卸载脚本会优先尝试将文件移至系统回收站；若失败则执行永久删除。脚本**不会**移除 Python 解释器本身。
 
-#### macOS / Linux
+After uninstalling user data, you may delete the entire `Distribution/` folder manually if you wish to remove the application completely.
 
-1. Open a terminal in the LexiMind folder.  
-   在 LexiMind 文件夹中打开终端。
-
-2. Make the uninstaller script executable and run it:  
-   赋予卸载脚本执行权限并运行：
-   ```bash
-   chmod +x uninstall.sh
-   ./uninstall.sh
-   ```
-
-3. Follow the prompts to confirm removal.  
-   根据提示确认删除。
-
-After uninstalling user data, you may delete the entire LexiMind folder manually if you wish to remove the application completely.
-
-卸载用户数据后，若希望完全移除应用，可手动删除整个 LexiMind 文件夹。
+卸载用户数据后，若希望完全移除应用，可手动删除整个 `Distribution/` 文件夹。
 
 ---
-
 
 ## 9. Expected Outcome · 预期成果
 
@@ -262,14 +271,7 @@ LexiMind/
 │   ├── style.css              # Stylesheet · 样式表
 │   └── script.js              # Frontend logic · 前端交互逻辑
 │
-├── leximind_windows/          # Windows standalone distribution · Windows 独立发行版
-│   └── run.bat                # Windows launcher script · Windows 启动脚本
-│
-├── leximind_macos/            # macOS standalone distribution · macOS 独立发行版
-│   └── run.sh                 # macOS launcher script · macOS 启动脚本
-│
-├── leximind_linux/            # Linux standalone distribution · Linux 独立发行版
-|   └── run.sh                 # Linux launcher script · Linux 启动脚本
+├── Distribution/          # Windows / macOS / Linux Distribution · Windows / macOS / Linux发行版
 |
 └─- leximind_development       # Content omitted. Containerized developing workflow · 内容略。此为容器化开发工作流。
 ```
