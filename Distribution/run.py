@@ -198,7 +198,7 @@ def main():
             print("[OK] API key saved to backend/.env")
         else:
             print("[WARNING] No API key entered. You can add it later to backend/.env as DEEPSEEK_API_KEY=your_key")
-
+            
     # Start server
     print("\n[INFO] Starting LexiMind backend server...")
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -221,14 +221,14 @@ def main():
             log_f.close()
         sys.exit(1)
 
-    # Quick check if process died immediately (e.g., syntax error)
+    # Quick check if process died immediately
     time.sleep(1.5)
     if not check_process_alive(server_process):
         if log_f is not subprocess.DEVNULL:
             log_f.close()
         sys.exit(1)
 
-    # Wait for server to respond on port
+    # Wait for server to respond
     print(f"[INFO] Waiting for server at {SERVER_URL} (timeout {WAIT_SECONDS}s)...")
     start_time = time.time()
     server_ready = False
@@ -237,7 +237,6 @@ def main():
             break
         try:
             with urllib.request.urlopen(SERVER_URL, timeout=2) as resp:
-                # Accept any 2xx/3xx status
                 server_ready = True
                 break
         except (urllib.error.URLError, ConnectionRefusedError, OSError):
@@ -245,38 +244,44 @@ def main():
 
     if server_ready:
         print("[OK] Server is up.")
-        print_firewall_hint()   # always show on macOS as a precaution
-    else:
-        print(f"[WARNING] Server did not respond within {WAIT_SECONDS} seconds.")
-        print(f"          Check {LOG_FILE} for details.")
         print_firewall_hint()
-        print(f"          You may open the browser manually at {SERVER_URL}")
+        print("[INFO] Opening browser at", SERVER_URL)
+        try:
+            webbrowser.open(SERVER_URL)
+        except Exception:
+            print("[WARNING] Failed to open browser automatically.")
 
-    print("[INFO] Opening browser at", SERVER_URL)
-    try:
-        webbrowser.open(SERVER_URL)
-    except Exception:
-        print("[WARNING] Failed to open browser automatically.")
+        print("\n========================================")
+        print("         LexiMind is running!")
+        print("========================================\n")
+        print("To stop the server, close this window or press Ctrl+C.")
+        print("To restart LexiMind, run this script again.\n")
 
-    print("\n========================================")
-    print("         LexiMind is running!")
-    print("========================================\n")
-    print("To stop the server, close this window or press Ctrl+C.")
-    print("To restart LexiMind, run this script again.\n")
-
-    try:
-        server_process.wait()
-    except KeyboardInterrupt:
-        print("\n[INFO] Stopping server...")
+        try:
+            server_process.wait()
+        except KeyboardInterrupt:
+            print("\n[INFO] Stopping server...")
+            try:
+                server_process.terminate()
+            except Exception:
+                pass
+            server_process.wait()
+    else:
+        # Server failed to become ready
+        print(f"\n[ERROR] Server did not respond within {WAIT_SECONDS} seconds.")
+        print(f"        Check {LOG_FILE} for details.")
+        print_firewall_hint()
+        print("\nThe backend process will now be terminated.")
         try:
             server_process.terminate()
+            server_process.wait(timeout=5)
         except Exception:
-            pass
-        server_process.wait()
-    finally:
-        if log_f is not subprocess.DEVNULL:
-            log_f.close()
+            server_process.kill()
+        print("[INFO] LexiMind launcher exiting. Please resolve the issue and try again.")
+        sys.exit(1)
 
+    if log_f is not subprocess.DEVNULL:
+        log_f.close()
 
 if __name__ == "__main__":
     main()
