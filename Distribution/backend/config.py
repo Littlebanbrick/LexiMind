@@ -12,6 +12,7 @@ load_dotenv()
 
 class Config:
     """Configuration class, providing default values and validation for necessary settings."""
+    MAX_HISTORY_RECORDS = int(os.getenv("MAX_HISTORY_RECORDS", 1000))
 
     # llm api configs
     DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')

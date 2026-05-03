@@ -107,19 +107,36 @@ def get_word_stats(term: Optional[str] = None, limit: int = 50) -> List[Dict[str
 
 
 # ---------- History table operations ----------
-def insert_history(user_input: str, command_type: str, result: Optional[str] = None) -> int:
-    """
-    Insert a new history record and return its ID.
-    """
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO history (user_input, command_type, result)
-            VALUES (?, ?, ?)
-        """, (user_input, command_type, result))
-        conn.commit()
-        return cursor.lastrowid
+def insert_history(user_input, command_type, result_text, db_path="backend/data/leximind.db"):
+    """Insert a history record and prune old ones if exceeding limit."""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    timestamp = datetime.now().isoformat()
 
+    cursor.execute(
+        "INSERT INTO history (timestamp, user_input, command_type, result) VALUES (?, ?, ?, ?)",
+        (timestamp, user_input, command_type, result_text)
+    )
+    conn.commit()
+
+    # Prune old records if total exceeds MAX_HISTORY_RECORDS
+    cursor.execute("SELECT COUNT(*) FROM history")
+    total = cursor.fetchone()[0]
+    max_records = config.MAX_HISTORY_RECORDS
+
+    if total > max_records:
+        # Delete the oldest records: delete rows where id NOT IN (the newest max_records)
+        cursor.execute("""
+            DELETE FROM history
+            WHERE id NOT IN (
+                SELECT id FROM history
+                ORDER BY timestamp DESC
+                LIMIT ?
+            )
+        """, (max_records,))
+        conn.commit()
+
+    conn.close()
 
 def get_recent_history(limit: int = 20) -> List[Dict[str, Any]]:
     """Get the most recent history records (ordered by time)"""

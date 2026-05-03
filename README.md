@@ -195,7 +195,58 @@ The script will automatically:
 > ```
 > 
 > Alternatively, configure your proxy correctly in your system settings.  
-> 若处于企业防火墙或代理环境下，脚本可能无法下载依赖。运行 `run.py` 前请**临时清空代理环境变量**（命令见上），或在系统设置中正确配置代理。
+> 若处于企业防火墙或代理环境下，脚本可能无法下载依赖。运行 `run.py` 前请**临时清空代理环境变量**（命令见上），或在系统设置中正确配置代理。 
+
+
+> **Important: Server Connection Failure · 重要：服务器无法连接**  
+> If the launcher reports "Server did not respond" or the browser cannot open `http://127.0.0.1:5000`,  
+> the backend may be blocked by a firewall, or the port may be occupied. Please follow the steps below:
+> 
+> **1. Check Firewall (macOS & Windows)**  
+> - **macOS**: Go to *System Settings > Network > Firewall > Options...* and ensure **python3** is set to **"Allow incoming connections"**.  
+> - **Windows**: When first running the backend, allow **Python** through the Windows Defender Firewall pop-up.  
+> - **Temporary Test**: Temporarily disable the firewall to see if the connection succeeds.
+> 
+> **2. Verify the Port (5000) is Free**  
+> ```bash
+> # macOS / Linux
+> lsof -i :5000
+> 
+> # Windows (Command Prompt as Administrator)
+> netstat -ano | findstr :5000
+> ```
+> If another process is using port 5000, terminate it or change the port in `backend/app.py`.
+> 
+> **3. Review the Server Log**  
+> Open `backend/server.log` and look for Python tracebacks or error messages (e.g., missing modules, API key issues).
+> 
+> **4. Retry After Clearing the Environment**  
+> Close the terminal, reopen it, and run the launcher again.
+> 
+> ---
+> 若启动器提示“Server did not respond”或浏览器无法打开 `http://127.0.0.1:5000`，  
+> 后端可能被防火墙阻止，或端口被占用。请按以下步骤排查：
+> 
+> **1. 检查防火墙（macOS 与 Windows）**  
+> - **macOS**：前往 *系统设置 > 网络 > 防火墙 > 选项...*，确保 **python3** 设置为 **“允许传入连接”**。  
+> - **Windows**：首次运行后端时，在 Windows Defender 防火墙弹窗中允许 **Python** 通过。  
+> - **临时测试**：暂时关闭防火墙以验证连接是否恢复。
+> 
+> **2. 确认 5000 端口未被占用**  
+> ```bash
+> # macOS / Linux
+> lsof -i :5000
+> 
+> # Windows（以管理员身份运行命令提示符）
+> netstat -ano | findstr :5000
+> ```
+> 如有其他进程占用，请结束该进程或修改 `backend/app.py` 中的端口号。
+> 
+> **3. 查看服务器日志**  
+> 打开 `backend/server.log`，查找 Python 错误堆栈或异常信息（例如缺少模块、API 密钥无效等）。
+> 
+> **4. 清理环境后重试**  
+> 关闭当前终端，重新打开并再次运行启动脚本。
 
 ---
 
