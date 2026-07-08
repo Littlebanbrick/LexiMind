@@ -2,3 +2,7 @@ flask==3.0.0
 python-dotenv==1.0.0
 requests==2.31.0
 flask-cors==4.0.0
+# send2trash is used by uninstall.py to send user data (venv/, *.db, .env) to
+# the OS recycle bin instead of permanently deleting it. Without it, the
+# uninstaller always falls back to permanent deletion.
+send2trash==1.8.3
