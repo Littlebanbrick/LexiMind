@@ -69,8 +69,8 @@ LexiMind 以一个本地 Python Web 服务器运行，同时提供 API 接口与
 | **LLM Integration · 大模型接入** | DeepSeek-V3 (primary) via SiliconCloud API<br>Gemini 1.5 Flash (optional) | Provide language intelligence · 提供语言智能 |
 
 > **Note · 注**：  
-> For simplicity, the application only provides access to DeepSeek-V3 by default. If you need to use other LLMs, please modify the relevant frontend and backend files after downloading.  
-> 出于简便性考虑，应用默认仅提供DeepSeek-V3的接入。如需使用其他大模型，请下载完成后自行修改前后端相关文件。
+> For simplicity, the application is wired to a single LLM (DeepSeek‑V3 via SiliconCloud). The frontend's former "Model" selector was non‑functional (the backend ignored the field) and has been removed; to use a different provider you must modify both the backend (`llm_client.py`) and the frontend.  
+> 出于简便性考虑，应用仅接入了单一的大模型（通过 SiliconCloud 的 DeepSeek‑V3）。前端原有的"模型选择"下拉框因后端始终忽略该字段而无效，已被移除；如需使用其他大模型，需同时修改后端（`llm_client.py`）与前端。
 
 ---
 
@@ -347,8 +347,16 @@ The `leximind_development/` directory contains a Docker‑based development envi
   为希望使用 Docker Compose 部署 LexiMind 的用户提供参考。
 
 **Relationship to the Main Project · 与主项目的关系**：
-- The core source code (`backend/`, `frontend/`) is **identical** across all distribution folders.  
-  核心源代码（`backend/`、`frontend/`）在所有分发目录中**完全一致**。  
+- The shared backend modules (`config.py`, `command_parser.py`, `llm_client.py`, `database.py`) and the entire `frontend/` are **identical** across all distribution folders, and are kept in sync by `sync.py`.  
+  共享的后端模块（`config.py`、`command_parser.py`、`llm_client.py`、`database.py`）以及整个 `frontend/` 在所有分发目录中**完全一致**，由 `sync.py` 保持同步。
+- `app.py` is **not** identical across folders and is **intentionally excluded** from `sync.py`:  
+  `app.py` 在各目录中**并不相同**，且被**有意排除**在 `sync.py` 同步范围之外：
+  - The **development** variant (`LexiMind_development/backend/app.py`) is API‑only — it runs behind the nginx reverse proxy, which also serves the static frontend.  
+    **开发版**（`LexiMind_development/backend/app.py`）仅提供 API —— 运行在 nginx 反向代理之后，由 nginx 同时托管静态前端。
+  - The **end‑user** distributions serve the static frontend themselves via extra routes (`/`, `/<path:filename>`, `/favicon.ico`) and additionally ship `run.py` / `uninstall.py`.  
+    **最终用户**发行版通过额外路由（`/`、`/<path:filename>`、`/favicon.ico`）自行托管静态前端，并额外附带 `run.py` / `uninstall.py`。
+  - When you change shared backend logic, run `sync.py` to propagate it; when you change `app.py` itself, edit **both** copies by hand.  
+    修改共享后端逻辑时，运行 `sync.py` 同步；修改 `app.py` 本身时，需**手动**编辑两份副本。
 - `leximind_development/` adds Docker configuration files (`Dockerfile`, `docker-compose.yml`, `nginx/`) on top of the shared codebase.  
   `leximind_development/` 在共享代码库的基础上额外增加了 Docker 配置文件（`Dockerfile`、`docker-compose.yml`、`nginx/`）。  
 - End‑user distributions (`leximind_windows/`, `leximind_macos/`, `leximind_linux/`) rely only on Python and pip, omitting Docker entirely.  
