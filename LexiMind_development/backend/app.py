@@ -1,18 +1,23 @@
 """
 app.py
-LexiMind backend main application entry point
-Integrates configuration, command parsing, LLM invocation, and database operations
+LexiMind backend main application entry point.
+Integrates configuration, command parsing, LLM invocation, and database operations.
+
+Dev variant: API-only (sits behind the nginx reverse proxy, which also serves
+the static frontend). The Distribution variant additionally serves the frontend
+files itself; keep the two in sync for shared logic, but do not duplicate static
+serving here.
 """
 
-import time
 from collections import defaultdict
+import time
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from dotenv import load_dotenv
 
-# Load environment variables (before importing other modules)
-load_dotenv()
-
+# config.py already calls load_dotenv(), so importing it populates the
+# environment for every downstream module (database, llm_client). There is no
+# need to call load_dotenv() again here.
 from config import config
 from command_parser import parse_command
 from llm_client import query_llm
@@ -21,15 +26,20 @@ from database import (
     record_word_query,
     insert_daily_article,
     get_today_article,
-    get_latest_article
+    get_latest_article,
+    get_recent_history,
+    get_word_stats,
 )
 
 # Initialize Flask application
 app = Flask(__name__)
 CORS(app)  # Allow cross-origin requests
 
+# Ensure required configuration is present at startup (raises if missing).
+config.validate()
+
 # ---------- Simple IP rate limiting ----------
-# Record request timestamps per IP (minute-level)
+# Record request timestamps per IP (minute-level).
 ip_request_log = defaultdict(list)
 RATE_LIMIT_WINDOW = 60  # seconds
 
@@ -70,7 +80,7 @@ def handle_query():
     # Get client IP address
     client_ip = request.remote_addr or 'unknown'
 
-    # Rate limit check
+    # Rate limit check (applied before parsing, as before)
     if is_rate_limited(client_ip):
         return jsonify({
             "error": "Rate limit exceeded. Please try again later."
@@ -89,9 +99,6 @@ def handle_query():
             "error": f"Input too long. Maximum {config.MAX_INPUT_LENGTH} characters allowed."
         }), 400
 
-    # Log request (for rate limiting)
-    log_request(client_ip)
-
     # 1. Command parsing
     parsed = parse_command(user_input)
     if parsed is None:
@@ -101,6 +108,20 @@ def handle_query():
 
     command_type = parsed['type']
     payload = parsed.get('payload') or parsed.get('words')
+
+    # Daily reading: return today's article if one was already generated today,
+    # instead of always regenerating (and burning tokens) on every request.
+    if command_type == 'DAILY_READING':
+        today_article = get_today_article()
+        if today_article is not None:
+            log_request(client_ip)
+            insert_history(user_input, command_type, today_article['content'])
+            return jsonify({"result": today_article['content']})
+
+    # Only count this request against the rate limit once we know it will
+    # actually invoke the LLM. Previously, invalid/over-length inputs also
+    # consumed the per-IP quota even though they never reached the model.
+    log_request(client_ip)
 
     # 2. Call LLM
     try:
@@ -128,7 +149,7 @@ def handle_query():
         for word in payload:
             record_word_query(word)
 
-    # Daily reading command: store generated article in daily_articles table
+    # Daily reading command: store the freshly generated article
     if command_type == 'DAILY_READING':
         insert_daily_article(result_text)
 
@@ -136,11 +157,10 @@ def handle_query():
     return jsonify({"result": result_text})
 
 
-# ---------- Optional: Get history endpoint (frontend can extend) ----------
+# ---------- Optional read endpoints ----------
 @app.route('/api/history', methods=['GET'])
 def get_history():
     """Get recent history records (optional)"""
-    from database import get_recent_history
     limit = request.args.get('limit', 20, type=int)
     if limit > 100:
         limit = 100
@@ -149,14 +169,28 @@ def get_history():
 
 
 @app.route('/api/stats/words', methods=['GET'])
-def get_word_stats():
+def word_stats():
     """Get word query statistics (optional)"""
-    from database import get_word_stats
     limit = request.args.get('limit', 50, type=int)
     if limit > 200:
         limit = 200
     stats = get_word_stats(limit=limit)
     return jsonify({"stats": stats})
+
+
+@app.route('/api/daily-reading', methods=['GET'])
+def get_daily_reading():
+    """
+    Return today's daily reading if it exists, otherwise the most recently
+    generated article. Exposes the daily_articles table that was previously
+    only written to, never read from a route.
+    """
+    article = get_today_article()
+    if article is None:
+        article = get_latest_article()
+    if article is None:
+        return jsonify({"result": None}), 404
+    return jsonify({"result": article['content']})
 
 
 # ---------- Error handling ----------
@@ -178,9 +212,12 @@ def internal_error(e):
 
 # ---------- Application entry point ----------
 if __name__ == '__main__':
-    # Ensure database initialization (database.py import already executes init_db)
+    # In development, FLASK_ENV=development enables the Flask debugger.
+    # Bind to config.FLASK_HOST (127.0.0.1 by default); set FLASK_HOST=0.0.0.0
+    # in the environment only when you intentionally want remote access (e.g.
+    # behind nginx in Docker) — never expose the debug server publicly.
     app.run(
-        host='0.0.0.0',
+        host=config.FLASK_HOST,
         port=config.FLASK_PORT,
         debug=(config.FLASK_ENV == 'development')
     )

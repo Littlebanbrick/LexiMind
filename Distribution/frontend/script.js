@@ -1,13 +1,16 @@
 /**
  * LexiMind Frontend Script
- * handling user input, calling backend api and rendering markdown results
+ * Handling user input, calling backend api and rendering markdown results.
+ *
+ * The backend is wired to a single LLM (DeepSeek-V3 via SiliconCloud); there is
+ * no model-switching on the server side, so this script no longer sends a
+ * `model` field (a previous version sent one that the backend silently ignored).
  */
 
 (function() {
     'use strict';
 
     // DOM elements
-    const modelSelect = document.getElementById('model-select');
     const commandInput = document.getElementById('command-input');
     const submitBtn = document.getElementById('submit-btn');
     const loadingIndicator = document.getElementById('loading-indicator');
@@ -51,7 +54,7 @@
     function setLoading(loading) {
         isRequesting = loading;
         submitBtn.disabled = loading;
-        
+
         if (loading) {
             submitBtn.textContent = 'Processing...';
             if (loadingIndicator) {
@@ -106,10 +109,8 @@
         // Empty the input field
         commandInput.value = '';
 
-        const selectedModel = modelSelect.value;
         const payload = {
-            input: userInput,
-            model: selectedModel
+            input: userInput
         };
 
         clearError();
