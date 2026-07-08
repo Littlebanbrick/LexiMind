@@ -8,6 +8,10 @@ services:
       - ./backend/data:/app/data
     environment:
       - FLASK_ENV=development
+      # Bind to all interfaces inside the container so nginx (another container)
+      # can reach the backend. The default (127.0.0.1) would only be reachable
+      # from inside the backend container itself.
+      - FLASK_HOST=0.0.0.0
     ports:
       - "5000:5000"
 

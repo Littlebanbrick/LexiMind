@@ -6,7 +6,9 @@ Reading configuration from environment variables, with support for .env files.
 import os
 from dotenv import load_dotenv
 
-# Loading environment variables from .env file (if it exists)
+# Loading environment variables from .env file (if it exists).
+# This runs once when the module is imported, so every other module that
+# imports `config` sees the populated environment without re-loading.
 load_dotenv()
 
 
@@ -22,8 +24,11 @@ class Config:
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')  # Optional
 
     # Flask configs
+    # Default to production: debug off, loopback-only binding.
+    # For Docker/remote use, set FLASK_HOST=0.0.0.0 in the environment.
+    FLASK_HOST = os.getenv('FLASK_HOST', '127.0.0.1')
     FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
-    FLASK_ENV = os.getenv('FLASK_ENV', 'development')  # development / production
+    FLASK_ENV = os.getenv('FLASK_ENV', 'production')  # development / production
 
     # db configs
     DATABASE_PATH = os.getenv('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'data', 'leximind.db'))
@@ -37,7 +42,7 @@ class Config:
 
     @classmethod
     def validate(cls):
-        """Ensuring the existence of necessary configs"""
+        """Ensure required settings exist. Raises ValueError if not."""
         if not cls.DEEPSEEK_API_KEY:
             raise ValueError(
                 "DEEPSEEK_API_KEY is not set. "
@@ -46,11 +51,9 @@ class Config:
         return True
 
 
-# Creating a global config instance for easy access across modules
+# Global config instance for easy access across modules
 config = Config()
 
-# Verify automatically when imported
-try:
-    config.validate()
-except ValueError as e:
-    print(f"[Config Error] {e}")
+# NOTE: validation is intentionally NOT run at import time so that importing
+# this module (e.g. for unit tests of command_parser) does not crash.
+# Call config.validate() explicitly at application startup (see app.py).
