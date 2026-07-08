@@ -15,16 +15,18 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from config import config
 
-# The path of the database file, defined in config.py
+# The path of the database file, defined in config.py.
 DB_PATH = config.DATABASE_PATH
 
-# Ensuring the directory for the database exists
+# Ensuring the directory for the database exists.
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 
 def get_db_connection():
     """
     Create and return a db connection with foreign keys enabled and row factory set.
+    All functions in this module must go through this helper so that the
+    configured DATABASE_PATH, row factory and PRAGMAs are applied consistently.
     """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row  # Enable dict-like access to rows
@@ -63,11 +65,24 @@ def init_db():
             CREATE TABLE IF NOT EXISTS daily_articles (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 content TEXT NOT NULL,           -- Article content (with source line)
-                generated_at DATE DEFAULT CURRENT_DATE
+                generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
         conn.commit()
+
+
+def _now_local() -> str:
+    """
+    Local-time timestamp in SQLite's `YYYY-MM-DD HH:MM:SS` text form.
+
+    We store an explicit local timestamp instead of relying on the column's
+    `DEFAULT CURRENT_TIMESTAMP`: that default is in UTC, but get_today_article()
+    compares against a local "today", so the two would disagree near midnight
+    (and all day in zones ahead of UTC), causing today's article to be missed
+    and a new one regenerated every request.
+    """
+    return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
 # ---------- Words table operations ----------
@@ -107,36 +122,42 @@ def get_word_stats(term: Optional[str] = None, limit: int = 50) -> List[Dict[str
 
 
 # ---------- History table operations ----------
-def insert_history(user_input, command_type, result_text, db_path="backend/data/leximind.db"):
-    """Insert a history record and prune old ones if exceeding limit."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    timestamp = datetime.now().isoformat()
+def insert_history(user_input: str, command_type: str, result_text: Optional[str]) -> None:
+    """
+    Insert a history record and prune old ones if exceeding the configured limit.
 
-    cursor.execute(
-        "INSERT INTO history (timestamp, user_input, command_type, result) VALUES (?, ?, ?, ?)",
-        (timestamp, user_input, command_type, result_text)
-    )
-    conn.commit()
-
-    # Prune old records if total exceeds MAX_HISTORY_RECORDS
-    cursor.execute("SELECT COUNT(*) FROM history")
-    total = cursor.fetchone()[0]
-    max_records = config.MAX_HISTORY_RECORDS
-
-    if total > max_records:
-        # Delete the oldest records: delete rows where id NOT IN (the newest max_records)
-        cursor.execute("""
-            DELETE FROM history
-            WHERE id NOT IN (
-                SELECT id FROM history
-                ORDER BY timestamp DESC
-                LIMIT ?
-            )
-        """, (max_records,))
+    Uses the same connection helper as the rest of the module (so the configured
+    DATABASE_PATH, row factory and PRAGMAs apply) and writes to the `created_at`
+    column that init_db() actually creates (a previous version wrote to a
+    non-existent `timestamp` column, which crashed every successful query).
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO history (user_input, command_type, result, created_at) VALUES (?, ?, ?, ?)",
+            (user_input, command_type, result_text, datetime.now().isoformat())
+        )
         conn.commit()
 
-    conn.close()
+        # Prune old records if total exceeds MAX_HISTORY_RECORDS.
+        # Cost is one COUNT + (only when over limit) one DELETE per request,
+        # which is negligible at this app's scale; if it ever grows, move this
+        # to a periodic cleanup instead of running it on every insert.
+        max_records = config.MAX_HISTORY_RECORDS
+        cursor.execute("SELECT COUNT(*) FROM history")
+        total = cursor.fetchone()[0]
+
+        if total > max_records:
+            cursor.execute("""
+                DELETE FROM history
+                WHERE id NOT IN (
+                    SELECT id FROM history
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                )
+            """, (max_records,))
+            conn.commit()
+
 
 def get_recent_history(limit: int = 20) -> List[Dict[str, Any]]:
     """Get the most recent history records (ordered by time)"""
@@ -157,9 +178,9 @@ def insert_daily_article(content: str) -> int:
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO daily_articles (content)
-            VALUES (?)
-        """, (content,))
+            INSERT INTO daily_articles (content, generated_at)
+            VALUES (?, ?)
+        """, (content, _now_local()))
         conn.commit()
         return cursor.lastrowid
 
