@@ -17,17 +17,33 @@ import shlex
 from typing import Optional, Dict, Any, List
 
 
+def _word_boundary(s: str, prefix: str) -> bool:
+    """
+    Return True if `s` is `prefix` followed by the end of the string or a
+    whitespace separator. This prevents prefix collisions such as "$cmp"
+    matching "$cmpx" or "$compare", and "$cn" matching "$cnfoo".
+    """
+    if not s.startswith(prefix):
+        return False
+    rest = s[len(prefix):]
+    return rest == '' or rest[0].isspace()
+
+
 def parse_command(user_input: str) -> Optional[Dict[str, Any]]:
     """
     Parse user input and return command type and parameters.
     Returns None if the format is invalid.
+
+    Prefix matching is order-sensitive and uses word boundaries so that
+    multi-character prefixes ($cmp, $cn, $$cn) are not shadowed by their
+    shorter prefixes ($) / ($$).
     """
     if not isinstance(user_input, str):
         return None
 
     s = user_input.strip()
 
-    # 1. Daily reading
+    # 1. Daily reading (exact match)
     if s == 'daily-reading':
         return {'type': 'DAILY_READING'}
 
@@ -45,36 +61,36 @@ def parse_command(user_input: str) -> Optional[Dict[str, Any]]:
             return None
         return {'type': 'WRITING', 'payload': text}
 
-    # 4. Phrase explanation (with Chinese)
-    if s.startswith('$$cn'):
+    # 4. Phrase explanation (with Chinese): must be "$$cn" + space
+    if _word_boundary(s, '$$cn'):
         phrase = s[4:].strip()
         if phrase == '':
             return None
         return {'type': 'PHRASE_CN', 'payload': phrase}
 
-    # 5. Phrase explanation (English only)
-    if s.startswith('$$'):
+    # 5. Phrase explanation (English only): must be "$$" + space
+    if _word_boundary(s, '$$'):
         phrase = s[2:].strip()
         if phrase == '':
             return None
         return {'type': 'PHRASE', 'payload': phrase}
 
-    # 6. Word explanation (with Chinese)
-    if s.startswith('$cn'):
+    # 6. Word explanation (with Chinese): must be "$cn" + space
+    if _word_boundary(s, '$cn'):
         word = s[3:].strip()
         if word == '' or ' ' in word:
             return None
         return {'type': 'WORD_CN', 'payload': word}
 
-    # 7. Word/phrase comparison (supports quoted phrases)
-    if s.startswith('$cmp'):
-        # Remove command prefix
+    # 7. Word/phrase comparison (supports quoted phrases): "$cmp" + space
+    if _word_boundary(s, '$cmp'):
         rest = s[4:].strip()
         if not rest:
             return None
 
-        # Use shlex.split to handle quoted arguments
-        # Note: shlex.split behaves differently on Windows by default; explicitly specify posix=True
+        # Use shlex.split to handle quoted arguments.
+        # Note: shlex.split behaves differently on Windows by default; explicitly
+        # pass posix=True for consistent quote handling across platforms.
         try:
             args = shlex.split(rest, posix=True)
         except ValueError:
@@ -88,8 +104,8 @@ def parse_command(user_input: str) -> Optional[Dict[str, Any]]:
 
         return {'type': 'CMP', 'words': args}
 
-    # 8. Word explanation (English only)
-    if s.startswith('$'):
+    # 8. Word explanation (English only): "$" + space, single token
+    if _word_boundary(s, '$'):
         word = s[1:].strip()
         if word == '' or ' ' in word:
             return None
@@ -117,21 +133,36 @@ def get_command_description(command_type: str) -> str:
 # Test code
 if __name__ == '__main__':
     test_cases = [
-        '$ abandon',
-        '$cn abandon',
-        '$$ take part in',
-        '$$cn take part in',
-        '$$$ This is a sample essay.',
-        'daily-reading',
-        '> What is TOEFL?',
-        '$cmp affect effect influence',
-        '$cmp "take part in" "join in" participate',
-        "$cmp 'take off' 'get off'",
-        '$cmp hello',                     # Invalid: fewer than two words
-        '$',                              # Invalid
-        'hello world',                    # Invalid
-        '$cmp "unclosed quote',           # Invalid: unmatched quote
+        ('$ abandon', {'type': 'WORD', 'payload': 'abandon'}),
+        ('$cn abandon', {'type': 'WORD_CN', 'payload': 'abandon'}),
+        ('$$ take part in', {'type': 'PHRASE', 'payload': 'take part in'}),
+        ('$$cn take part in', {'type': 'PHRASE_CN', 'payload': 'take part in'}),
+        ('$$$ This is a sample essay.', {'type': 'WRITING', 'payload': 'This is a sample essay.'}),
+        ('daily-reading', {'type': 'DAILY_READING'}),
+        ('> What is TOEFL?', {'type': 'GENERAL', 'payload': 'What is TOEFL?'}),
+        ('$cmp affect effect influence', {'type': 'CMP', 'words': ['affect', 'effect', 'influence']}),
+        ('$cmp "take part in" "join in" participate',
+         {'type': 'CMP', 'words': ['take part in', 'join in', 'participate']}),
+        ("$cmp 'take off' 'get off'", {'type': 'CMP', 'words': ['take off', 'get off']}),
+        # Invalid cases (must return None)
+        ('$cmp hello', None),                 # fewer than two words
+        ('$', None),
+        ('hello world', None),
+        ('$cmp "unclosed quote', None),       # unmatched quote
+        # Prefix-collision cases that previously parsed incorrectly
+        ('$compare foo bar', None),           # must NOT be swallowed by $cmp
+        ('$cmpx a b', None),
+        ('$cnfoo', None),
+        ('$$cmpx', None),
     ]
-    for case in test_cases:
+    failures = 0
+    for case, expected in test_cases:
         result = parse_command(case)
-        print(f"{case!r:45} -> {result}")
+        ok = result == expected
+        if not ok:
+            failures += 1
+        print(f"{'OK ' if ok else 'XX '} {case!r:45} -> {result}")
+        if not ok:
+            print(f"      expected: {expected}")
+    print()
+    print(f"{len(test_cases) - failures}/{len(test_cases)} passed")
