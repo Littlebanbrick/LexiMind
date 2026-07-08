@@ -36,9 +36,21 @@ def version_satisfies(v_tuple):
 
 
 def try_cmd_version(cmd_parts):
-    """Run a command and return parsed version tuple if version >=3.10."""
+    """
+    Run a command that prints its version and return the parsed version tuple if >=3.10.
+
+    Always pass `--version` (and close stdin) so we never launch the interactive
+    REPL: running `python` with no arguments opens the REPL, which reads from
+    stdin and hangs forever (the previous code did exactly that for the bare
+    ["python"] candidate, blocking the launcher indefinitely on Windows where
+    `python` may resolve to a launcher stub).
+    """
     try:
-        p = subprocess.run(cmd_parts, capture_output=True, text=True, check=True)
+        p = subprocess.run(
+            cmd_parts + ["--version"],
+            capture_output=True, text=True, check=True,
+            stdin=subprocess.DEVNULL,
+        )
         version_out = (p.stdout or p.stderr).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
